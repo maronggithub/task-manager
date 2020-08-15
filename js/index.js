@@ -1,7 +1,14 @@
+var sort = {
+  key: null,
+  order: null,
+};
 function searchTasks() {
   let searchText = document.getElementById('searchText').value;
   if (searchText.trim()) {
     let filteredTasks = findTasksByName(searchText.trim());
+    if (sort.key && sort.order) {
+      filteredTasks.sort(compareValues(sort.key, sort.order));
+    }
     showTasks(filteredTasks);
   }
 }
@@ -29,8 +36,9 @@ function filterTasksByStatus(status) {
 function showStatisticesCards() {
   let allTasksCount = getAllTasks().length;
   document.getElementById('allTasksCount').textContent = allTasksCount;
-  let activeTasksCount = tasks.filter((task) => task.status === 'Active')
-    .length;
+  let activeTasksCount = getAllTasks().filter(
+    (task) => task.status === 'Active'
+  ).length;
   document.getElementById('activeTasksCount').textContent = activeTasksCount;
   let activeTasksProportion =
     allTasksCount > 0
@@ -39,8 +47,9 @@ function showStatisticesCards() {
   document.getElementById(
     'activeTasksProportion'
   ).textContent = activeTasksProportion;
-  let paddingTasksCount = tasks.filter((task) => task.status === 'Padding')
-    .length;
+  let paddingTasksCount = getAllTasks().filter(
+    (task) => task.status === 'Padding'
+  ).length;
   document.getElementById('paddingTasksCount').textContent = paddingTasksCount;
   let paddingTasksProportion =
     allTasksCount > 0
@@ -49,8 +58,9 @@ function showStatisticesCards() {
   document.getElementById(
     'paddingTasksProportion'
   ).textContent = paddingTasksProportion;
-  let closedTasksCount = tasks.filter((task) => task.status === 'Closed')
-    .length;
+  let closedTasksCount = getAllTasks().filter(
+    (task) => task.status === 'Closed'
+  ).length;
   document.getElementById('closedTasksCount').textContent = closedTasksCount;
   let closedTasksProportion =
     allTasksCount > 0
@@ -62,51 +72,84 @@ function showStatisticesCards() {
 }
 
 function showAllTasks() {
-  saveAllTasks(tasks);
   renderPage();
 }
 
-function renderPage() {
+function sortTasks(ele, sortKey, order) {
+  let focusElements = document.getElementsByClassName('sort-btn-focus');
+  Array.from(focusElements).forEach((element) => {
+    element.classList.remove('sort-btn-focus');
+    element.classList.add('sort-btn-normal');
+  });
+
+  ele.classList.remove('sort-btn-normal');
+  ele.classList.add('sort-btn-focus');
+  sort.key = sortKey;
+  sort.order = order;
+  renderPage(sortKey, order);
+}
+
+function renderPage(sortKey = 'createDate', order) {
   showStatisticesCards();
-  showTasks(getAllTasks());
+  let searchText = document.getElementById('searchText').value;
+  let allTask = getAllTasks();
+  if (searchText.trim()) {
+    allTask = findTasksByName(searchText.trim());
+  }
+  allTask.sort(compareValues(sortKey, order));
+  showTasks(allTask);
+}
+
+function compareValues(key, order = 'desc') {
+  return function innerSort(a, b) {
+    if (!a.hasOwnProperty(key) || !b.hasOwnProperty(key)) {
+      return 0;
+    }
+
+    const varA = typeof a[key] === 'string' ? a[key].toUpperCase() : a[key];
+    const varB = typeof b[key] === 'string' ? b[key].toUpperCase() : b[key];
+
+    let comparison = varA > varB ? 1 : -1;
+
+    return order === 'asc' ? comparison : comparison * -1;
+  };
 }
 
 function showTasks(tasks) {
   let taskBody = document.getElementById('taskbody');
   taskBody.innerHTML = '';
-  console.log(tasks);
   if (tasks && tasks.length > 0) {
     tasks.forEach((task, index) => {
-      let li = generateTaskElement(task, index + 1);
-      taskBody.appendChild(li);
+      let row = generateTaskElement(task, index + 1);
+      taskBody.appendChild(row);
     });
   }
 }
 
 function generateTaskElement(task, index) {
-  let li = document.createElement('li');
-  li.classList.add('task-line');
-  let indexElement = document.createElement('span');
+  let row = document.createElement('tr');
+  row.classList.add('task-row');
+  let indexElement = document.createElement('td');
   indexElement.classList.add('task-num-col');
   indexElement.textContent = index;
-  li.appendChild(indexElement);
+  row.appendChild(indexElement);
 
-  let nameElement = document.createElement('span');
+  let nameElement = document.createElement('td');
   nameElement.classList.add('task-name-col');
   nameElement.textContent = task.name;
-  li.appendChild(nameElement);
+  row.appendChild(nameElement);
 
-  let desElement = document.createElement('span');
+  let desElement = document.createElement('td');
   desElement.classList.add('task-desc-col');
   desElement.textContent = task.description;
-  li.appendChild(desElement);
+  row.appendChild(desElement);
 
-  let deadlineElement = document.createElement('span');
+  let deadlineElement = document.createElement('td');
   deadlineElement.classList.add('task-deadline-col');
   deadlineElement.textContent = task.deadline;
-  li.appendChild(deadlineElement);
+  row.appendChild(deadlineElement);
 
-  let statusElement = document.createElement('span');
+  let statusElement = document.createElement('td');
   statusElement.classList.add('task-status-col');
   switch (task.status) {
     case 'Active':
@@ -121,13 +164,13 @@ function generateTaskElement(task, index) {
     default:
   }
   statusElement.textContent = task.status;
-  li.appendChild(statusElement);
+  row.appendChild(statusElement);
 
-  let operatorElement = document.createElement('span');
+  let operatorElement = document.createElement('td');
   operatorElement.classList.add('task-operation-col');
   let deleteBtn = document.createElement('button');
   deleteBtn.classList.add('btn-icon');
-  deleteBtn.setAttribute('onclick', 'showDeleteModalPopover(' + task.id + ')');
+  deleteBtn.setAttribute('onclick', 'createDeletePopover(' + task.id + ')');
   let deleteIcon = document.createElement('img');
   deleteIcon.setAttribute('src', './images/delete.svg');
   deleteBtn.appendChild(deleteIcon);
@@ -135,11 +178,12 @@ function generateTaskElement(task, index) {
 
   let updateBtn = document.createElement('button');
   updateBtn.classList.add('btn-icon');
+  updateBtn.setAttribute('onclick', 'createUpdateTaskPopover(' + task.id + ')');
   let uopdateIcon = document.createElement('img');
   uopdateIcon.setAttribute('src', './images/update.svg');
   updateBtn.appendChild(uopdateIcon);
   operatorElement.appendChild(updateBtn);
 
-  li.appendChild(operatorElement);
-  return li;
+  row.appendChild(operatorElement);
+  return row;
 }
